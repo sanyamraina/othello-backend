@@ -1,16 +1,15 @@
 from fastapi import FastAPI, HTTPException
-from app.schemas import MoveRequest, MoveResponse
-from core.game import make_move, make_random_ai_move
-
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List
 
-app = FastAPI(
-    title="Othello Backend",
-    description="FastAPI backend for Othello AI",
-    version="0.1.0"
-)
+from core.game import make_move
+from core.ai import find_best_move
+from core.rules import get_valid_moves
 
+app = FastAPI()
 
+# ✅ CORS (Vite default is 5173)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -22,34 +21,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------- Schemas ----------
+
+class MoveRequest(BaseModel):
+    board: List[List[int]]
+    player: int
+    row: int
+    col: int
+
+class AIMoveRequest(BaseModel):
+    board: List[List[int]]
+    player: int
 
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
+# ---------- Routes ----------
 
-
-@app.post("/move", response_model=MoveResponse)
-def move(request: MoveRequest):
+@app.post("/move")
+def move(req: MoveRequest):
     try:
-        if request.use_ai:
-            return make_random_ai_move(
-                request.board,
-                request.player
-            )
-
-        if request.row is None or request.col is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Row and col required for human move"
-            )
-
-        return make_move(
-            request.board,
-            request.player,
-            request.row,
-            request.col
-        )
-
+        return make_move(req.board, req.player, req.row, req.col)
     except ValueError as e:
+        # apply_move raises ValueError("Invalid move")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/ai-move")
+def ai_move(req: AIMoveRequest):
+    moves = get_valid_moves(req.board, req.player)
+
+    if not moves:
+        # Forced pass for AI (we're not doing full game-over handling here yet)
+        return {
+            "board": req.board,
+            "next_player": -req.player,
+            "valid_moves": [{"row": r, "col": c} for r, c in get_valid_moves(req.board, -req.player)],
+            "game_over": False,
+            "winner": None,
+            "move": None,
+        }
+
+    row, col = find_best_move(req.board, req.player)
+
+    try:
+        result = make_move(req.board, req.player, row, col)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"AI produced invalid move: {e}")
+
+    result["move"] = {"row": row, "col": col}
+    return result
