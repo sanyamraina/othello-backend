@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict
 from core.rules import get_valid_moves
 from core.board import apply_move
+import random
 
 
 def count_discs(board: List[List[int]]) -> Dict[int, int]:
@@ -47,3 +48,20 @@ def make_move(
     "game_over": game_over,
     "winner": winner,
 }
+
+
+def make_random_ai_move(board, player):
+    moves = get_valid_moves(board, player)
+
+    if not moves:
+        # AI must pass
+        return {
+            "board": board,
+            "next_player": -player,
+            "valid_moves": get_valid_moves(board, -player),
+            "game_over": False,
+            "winner": None,
+        }
+
+    row, col = random.choice(moves)
+    return make_move(board, player, row, col)
