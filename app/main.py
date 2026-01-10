@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 
-from core.game import make_move
+from core.game import make_move, count_discs
 from core.ai import find_best_move
 from core.rules import get_valid_moves
 
@@ -50,11 +50,33 @@ def ai_move(req: AIMoveRequest):
     moves = get_valid_moves(req.board, req.player)
 
     if not moves:
-        # Forced pass for AI (we're not doing full game-over handling here yet)
+        # Forced pass for AI: check whether opponent has moves.
+        opponent = -req.player
+        opponent_moves = get_valid_moves(req.board, opponent)
+
+        # If opponent also has no moves -> game over
+        if not opponent_moves:
+            counts = count_discs(req.board)
+            winner = None
+            if counts[1] > counts[-1]:
+                winner = 1
+            elif counts[-1] > counts[1]:
+                winner = -1
+
+            return {
+                "board": req.board,
+                "next_player": None,
+                "valid_moves": [],
+                "game_over": True,
+                "winner": winner,
+                "move": None,
+            }
+
+        # Otherwise opponent gets to move (AI passes)
         return {
             "board": req.board,
-            "next_player": -req.player,
-            "valid_moves": [{"row": r, "col": c} for r, c in get_valid_moves(req.board, -req.player)],
+            "next_player": opponent,
+            "valid_moves": [{"row": r, "col": c} for r, c in opponent_moves],
             "game_over": False,
             "winner": None,
             "move": None,
@@ -69,3 +91,9 @@ def ai_move(req: AIMoveRequest):
 
     result["move"] = {"row": row, "col": col}
     return result
+
+@app.post("/valid-moves")
+def valid_moves(req: AIMoveRequest):
+    moves = get_valid_moves(req.board, req.player)
+    return {"valid_moves": [{"row": r, "col": c} for r, c in moves]}
+
