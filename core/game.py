@@ -18,7 +18,7 @@ def make_move(
     row: int,
     col: int
 ):
-    new_board = apply_move(board, player, row, col)
+    new_board, flips = apply_move(board, player, row, col)
     next_player = -player
 
     next_moves = get_valid_moves(new_board, next_player)
@@ -44,4 +44,5 @@ def make_move(
         "valid_moves": [{"row": r, "col": c} for r, c in next_moves],
         "game_over": game_over,
         "winner": winner,
+        "flipped": [{"row": r, "col": c} for r, c in flips],
     }

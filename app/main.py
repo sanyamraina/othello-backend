@@ -9,7 +9,6 @@ from core.rules import get_valid_moves
 
 app = FastAPI()
 
-# ✅ CORS (Vite default is 5173)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
