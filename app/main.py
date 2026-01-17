@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, conint, validator
 from typing import List
 
 from core.game import make_move, count_discs
@@ -23,14 +23,44 @@ app.add_middleware(
 # ---------- Schemas ----------
 
 class MoveRequest(BaseModel):
-    board: List[List[int]]
-    player: int
-    row: int
-    col: int
+    board: List[List[conint(ge=-1, le=1)]]
+    player: conint(ge=-1, le=1)
+    row: conint(ge=0, le=7)
+    col: conint(ge=0, le=7)
+
+    @validator("player")
+    def validate_player(cls, player):
+        if player == 0:
+            raise ValueError("Player must be 1 or -1")
+        return player
+
+    @validator("board")
+    def validate_board_shape(cls, board):
+        if len(board) != 8:
+            raise ValueError("Board must have exactly 8 rows")
+        for row in board:
+            if len(row) != 8:
+                raise ValueError("Each board row must have exactly 8 columns")
+        return board
 
 class AIMoveRequest(BaseModel):
-    board: List[List[int]]
-    player: int
+    board: List[List[conint(ge=-1, le=1)]]
+    player: conint(ge=-1, le=1)
+
+    @validator("player")
+    def validate_player(cls, player):
+        if player == 0:
+            raise ValueError("Player must be 1 or -1")
+        return player
+
+    @validator("board")
+    def validate_board_shape(cls, board):
+        if len(board) != 8:
+            raise ValueError("Board must have exactly 8 rows")
+        for row in board:
+            if len(row) != 8:
+                raise ValueError("Each board row must have exactly 8 columns")
+        return board
 
 
 # ---------- Routes ----------
@@ -95,4 +125,3 @@ def ai_move(req: AIMoveRequest):
 def valid_moves(req: AIMoveRequest):
     moves = get_valid_moves(req.board, req.player)
     return {"valid_moves": [{"row": r, "col": c} for r, c in moves]}
-

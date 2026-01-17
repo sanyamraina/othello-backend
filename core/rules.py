@@ -12,6 +12,8 @@ def in_bounds(r: int, c: int) -> bool:
 
 
 def get_flips(board: List[List[int]], player: int, row: int, col: int) -> List[Tuple[int, int]]:
+    if not in_bounds(row, col):
+        return []
     if board[row][col] != 0:
         return []
 
