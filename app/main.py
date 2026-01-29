@@ -46,6 +46,7 @@ class MoveRequest(BaseModel):
 class AIMoveRequest(BaseModel):
     board: List[List[conint(ge=-1, le=1)]]
     player: conint(ge=-1, le=1)
+    difficulty: str = "medium"  # easy, medium, hard, expert
 
     @validator("player")
     def validate_player(cls, player):
@@ -61,6 +62,13 @@ class AIMoveRequest(BaseModel):
             if len(row) != 8:
                 raise ValueError("Each board row must have exactly 8 columns")
         return board
+    
+    @validator("difficulty")
+    def validate_difficulty(cls, difficulty):
+        valid_difficulties = ["easy", "medium", "hard", "expert"]
+        if difficulty.lower() not in valid_difficulties:
+            raise ValueError(f"Difficulty must be one of: {valid_difficulties}")
+        return difficulty.lower()
 
 
 # ---------- Routes ----------
@@ -111,7 +119,7 @@ def ai_move(req: AIMoveRequest):
             "move": None,
         }
 
-    row, col = find_best_move(req.board, req.player)
+    row, col = find_best_move(req.board, req.player, req.difficulty)
 
     try:
         result = make_move(req.board, req.player, row, col)
