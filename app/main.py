@@ -2,10 +2,20 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, conint, validator
 from typing import List
+import os
+from dotenv import load_dotenv
 
 from core.game import make_move, count_discs
-from core.ai import find_best_move
+from core.ai import find_best_move, find_best_move_with_cache
 from core.rules import get_valid_moves
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI()
 
@@ -100,6 +110,7 @@ def ai_move(req: AIMoveRequest):
             elif counts[-1] > counts[1]:
                 winner = -1
 
+            logger.info("AI PASS: Game over, no moves available")
             return {
                 "board": req.board,
                 "next_player": None,
@@ -107,9 +118,15 @@ def ai_move(req: AIMoveRequest):
                 "game_over": True,
                 "winner": winner,
                 "move": None,
+                "cache_info": {
+                    "cache_hit": False,
+                    "source": "game_over",
+                    "depth": 0
+                }
             }
 
         # Otherwise opponent gets to move (AI passes)
+        logger.info("AI PASS: No moves, opponent continues")
         return {
             "board": req.board,
             "next_player": opponent,
@@ -117,9 +134,19 @@ def ai_move(req: AIMoveRequest):
             "game_over": False,
             "winner": None,
             "move": None,
+            "cache_info": {
+                "cache_hit": False,
+                "source": "pass",
+                "depth": 0
+            }
         }
 
-    row, col = find_best_move(req.board, req.player, req.difficulty)
+    # Get AI move with cache information
+    (row, col), cache_hit, depth = find_best_move_with_cache(req.board, req.player, req.difficulty)
+    
+    # Log cache status prominently
+    cache_source = "DATABASE" if cache_hit else "FRESH_SEARCH"
+    logger.info(f"AI MOVE: {cache_source} - Player {req.player} selected ({row},{col}) at depth {depth} using {req.difficulty} difficulty")
 
     try:
         result = make_move(req.board, req.player, row, col)
@@ -127,6 +154,12 @@ def ai_move(req: AIMoveRequest):
         raise HTTPException(status_code=400, detail=f"AI produced invalid move: {e}")
 
     result["move"] = {"row": row, "col": col}
+    result["cache_info"] = {
+        "cache_hit": cache_hit,
+        "source": cache_source,
+        "depth": depth
+    }
+    
     return result
 
 @app.post("/valid-moves")
